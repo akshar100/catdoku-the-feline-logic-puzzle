@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0D1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Catdoku - The Feline Logic Puzzle</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #388bfd;
+      --danger: #f85149;
+      --success: #3fb950;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+    }
+    #app-container {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      justify-content: space-between;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .stat-val {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .rules-banner {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+    #grid-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #090d13;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      display: grid;
+      gap: 2px;
+      padding: 4px;
+      overflow: hidden;
+    }
+    .cell {
+      position: relative;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      cursor: pointer;
+      transition: transform 0.1s, filter 0.15s;
+    }
+    .cell:active {
+      transform: scale(0.94);
+    }
+    .cell.has-cat {
+      animation: popIn 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .cell.mark-x {
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .cell.conflict {
+      animation: shake 0.35s ease-in-out infinite alternate;
+      box-shadow: inset 0 0 0 3px var(--danger);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.4); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes shake {
+      0% { transform: translateX(-2px); }
+      100% { transform: translateX(2px); }
+    }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .btn {
+      min-height: 48px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:active {
+      background: #21262d;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent-hover);
+    }
+    .btn-primary:active {
+      background: var(--accent-hover);
+    }
+    .mode-switch {
+      display: flex;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      margin-top: 10px;
+    }
+    .mode-btn {
+      flex: 1;
+      min-height: 40px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 400px;
+      width: 100%;
+      padding: 24px;
+      text-align: center;
+    }
+    .modal-box h2 {
+      margin-bottom: 12px;
+    }
+    .modal-box p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+    .modal-box .btn {
+      width: 100%;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-container">
+    <header>
+      <div class="brand">
+        <span style="font-size: 1.8rem;">🐱</span>
+        <h1>Catdoku</h1>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button id="btn-settings" class="btn" style="min-height: 38px; padding: 0 12px;" aria-label="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <div class="rules-banner">
+      Place 1 🐱 per <strong>row</strong>, <strong>column</strong> & <strong>color region</strong>.<br>
+      Cats cannot touch each other (not even diagonally)!
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-label">Cats Left</span>
+        <span id="cats-left" class="stat-val">5 / 5</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Timer</span>
+        <span id="timer" class="stat-val">00:00</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Size</span>
+        <span id="board-size-lbl" class="stat-val">5×5</span>
+      </div>
+    </div>
+
+    <div id="grid-wrapper"></div>
+
+    <div class="mode-switch">
+      <button id="mode-cat" class="mode-btn active">🐱 Place Cat</button>
+      <button id="mode-x" class="mode-btn">✕ Mark Empty</button>
+    </div>
+
+    <div class="controls-grid">
+      <button id="btn-undo" class="btn" title="Undo">↩ Undo</button>
+      <button id="btn-clear" class="btn" title="Clear">🧹 Clear</button>
+      <button id="btn-hint" class="btn" title="Hint">💡 Hint</button>
+      <button id="btn-new" class="btn btn-primary" title="New Game">🎲 New</button>
+    </div>
+  </div>
+
+  <!-- Win Modal -->
+  <div id="win-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div style="font-size: 3rem; margin-bottom: 10px;">🐾 🏆 😻</div>
+      <h2>Purr-fect Victory!</h2>
+      <p id="win-desc">You solved the puzzle without any clashing cats.</p>
+      <button id="btn-win-next" class="btn btn-primary">Play Next Puzzle</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-box" style="text-align: left;">
+      <h2 style="text-align: center;">Settings & Options</h2>
+      <div style="margin-bottom: 16px;">
+        <label style="display:block; font-size:0.85rem; margin-bottom:6px; color:var(--text-muted);">Board Size</label>
+        <select id="size-select" style="width:100%; min-height:44px; background:#0d1117; color:#fff; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:1rem;">
+          <option value="4">4 × 4 (Easy)</option>
+          <option value="5" selected>5 × 5 (Standard)</option>
+          <option value="6">6 × 6 (Tricky)</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; justify-content: space-between; font-size:0.9rem;">
+          <span>Sound Effects</span>
+          <input type="checkbox" id="sound-toggle" checked style="width: 20px; height: 20px;">
+        </label>
+      </div>
+      <button id="btn-export-pwa" class="btn btn-primary" style="margin-bottom: 8px;">📦 Download PWA (.ZIP)</button>
+      <button id="btn-close-settings" class="btn">Close</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    // Audio synthesizer using Web Audio API
+    const AudioEngine = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      meow() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(740, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.28);
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      },
+      pop() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      },
+      win() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+          const now = this.ctx.currentTime + (i * 0.12);
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        });
+      }
+    };
+
+    // Color Palettes for Regions
+    const PALETTES = [
+      '#a2592a', '#2b6b55', '#3d528b', '#82387a', '#786e24', '#286f78', '#6b3232'
+    ];
+
+    // State Management & Logic Engine
+    const AppState = {
+      N: 5,
+      board: [], // { r, c, colorId, state: 0 (empty) | 1 (cat) | 2 (x) }
+      solution: [],
+      history: [],
+      timerSec: 0,
+      timerInterval: null,
+      mode: 'cat', // 'cat' or 'x'
+      isWon: false,
+
+      save() {
+        const data = {
+          N: this.N,
+          board: this.board,
+          solution: this.solution,
+          history: this.history,
+          timerSec: this.timerSec,
+          sound: AudioEngine.enabled
+        };
+        localStorage.setItem('catdoku_save_v1', JSON.stringify(data));
+      },
+
+      load() {
+        const raw = localStorage.getItem('catdoku_save_v1');
+        if (!raw) return false;
+        try {
+          const data = JSON.parse(raw);
+          this.N = data.N || 5;
+          this.board = data.board;
+          this.solution = data.solution;
+          this.history = data.history || [];
+          this.timerSec = data.timerSec || 0;
+          AudioEngine.enabled = data.sound !== undefined ? data.sound : true;
+          return true;
+        } catch(e) {
+          return false;
+        }
+      }
+    };
+
+    // Puzzle Generator
+    function generatePuzzle(N) {
+      // 1. Find valid N cats configuration (1 per row, 1 per col, no touch)
+      let solution = null;
+      for (let attempt = 0; attempt < 1000; attempt++) {
+        const cols = [];
+        const valid = tryPlaceCat(0, N, cols);
+        if (valid) {
+          solution = cols.map((c, r) => ({ r, c }));
+          break;
+        }
+      }
+      if (!solution) {
+        // Fallback for smaller grids if random search timed out
+        solution = [];
+        for (let r = 0; r < N; r++) solution.push({ r, c: (r * 2 + 1) % N });
+      }
+
+      // 2. Generate N contiguous color regions such that each region contains exactly one solution cat
+      const grid = Array.from({ length: N }, () => Array(N).fill(-1));
+      solution.forEach((pt, id) => {
+        grid[pt.r][pt.c] = id;
+      });
+
+      // Expand color regions
+      let unassigned = N * N - N;
+      while (unassigned > 0) {
+        let changed = false;
+        for (let id = 0; id < N; id++) {
+          const cellsOfId = [];
+          for (let r = 0; r < N; r++) {
+            for (let c = 0; c < N; c++) {
+              if (grid[r][c] === id) cellsOfId.push({ r, c });
+            }
+          }
+          const neighbors = [];
+          cellsOfId.forEach(pt => {
+            [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+              const nr = pt.r + dr, nc = pt.c + dc;
+              if (nr >= 0 && nr < N && nc >= 0 && nc < N && grid[nr][nc] === -1) {
+                neighbors.push({ r: nr, c: nc });
+              }
+            });
+          });
+
+          if (neighbors.length > 0) {
+            const pick = neighbors[Math.floor(Math.random() * neighbors.length)];
+            grid[pick.r][pick.c] = id;
+            unassigned--;
+            changed = true;
+          }
+        }
+        if (!changed) break;
+      }
+
+      // If any untouched cell remains, assign to nearest
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (grid[r][c] === -1) grid[r][c] = (r + c) % N;
+        }
+      }
+
+      const board = [];
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          board.push({
+            r, c,
+            colorId: grid[r][c],
+            state: 0
+          });
+        }
+      }
+      return { board, solution };
+    }
+
+    function tryPlaceCat(row, N, cols) {
+      if (row === N) return true;
+      const order = Array.from({ length: N }, (_, i) => i).sort(() => Math.random() - 0.5);
+      for (let c of order) {
+        if (cols.includes(c)) continue;
+        let ok = true;
+        for (let prevR = 0; prevR < row; prevR++) {
+          const prevC = cols[prevR];
+          if (Math.abs(prevR - row) <= 1 && Math.abs(prevC - c) <= 1) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) {
+          cols.push(c);
+          if (tryPlaceCat(row + 1, N, cols)) return true;
+          cols.pop();
+        }
+      }
+      return false;
+    }
+
+    // UI Rendering
+    function renderBoard() {
+      const container = document.getElementById('grid-wrapper');
+      container.innerHTML = '';
+      container.style.gridTemplateColumns = `repeat(${AppState.N}, 1fr)`;
+
+      const conflicts = detectConflicts();
+
+      AppState.board.forEach((cell, idx) => {
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.style.backgroundColor = PALETTES[cell.colorId % PALETTES.length];
+        el.dataset.index = idx;
+
+        // Visual region borders
+        const rightCell = AppState.board.find(b => b.r === cell.r && b.c === cell.c + 1);
+        const bottomCell = AppState.board.find(b => b.r === cell.r + 1 && b.c === cell.c);
+        if (rightCell && rightCell.colorId !== cell.colorId) {
+          el.style.borderRight = '3px solid rgba(255,255,255,0.7)';
+        }
+        if (bottomCell && bottomCell.colorId !== cell.colorId) {
+          el.style.borderBottom = '3px solid rgba(255,255,255,0.7)';
+        }
+
+        if (cell.state === 1) {
+          el.classList.add('has-cat');
+          el.textContent = '🐱';
+        } else if (cell.state === 2) {
+          el.classList.add('mark-x');
+          el.textContent = '✕';
+        }
+
+        if (conflicts.has(idx)) {
+          el.classList.add('conflict');
+          if (cell.state === 1) el.textContent = '😾';
+        }
+
+        el.addEventListener('click', () => handleCellClick(idx));
+        el.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          handleCellAltClick(idx);
+        });
+
+        container.appendChild(el);
+      });
+
+      updateStats();
+    }
+
+    function detectConflicts() {
+      const conflictIndices = new Set();
+      const cats = [];
+      AppState.board.forEach((cell, idx) => {
+        if (cell.state === 1) cats.push({ ...cell, idx });
+      });
+
+      for (let i = 0; i < cats.length; i++) {
+        for (let j = i + 1; j < cats.length; j++) {
+          const a = cats[i], b = cats[j];
+          const sameRow = a.r === b.r;
+          const sameCol = a.c === b.c;
+          const sameColor = a.colorId === b.colorId;
+          const touching = Math.abs(a.r - b.r) <= 1 && Math.abs(a.c - b.c) <= 1;
+
+          if (sameRow || sameCol || sameColor || touching) {
+            conflictIndices.add(a.idx);
+            conflictIndices.add(b.idx);
+          }
+        }
+      }
+      return conflictIndices;
+    }
+
+    function handleCellClick(index) {
+      if (AppState.isWon) return;
+      const cell = AppState.board[index];
+      recordHistory();
+
+      if (AppState.mode === 'cat') {
+        if (cell.state === 1) {
+          cell.state = 0;
+          AudioEngine.pop();
+        } else {
+          cell.state = 1;
+          AudioEngine.meow();
+        }
+      } else {
+        if (cell.state === 2) {
+          cell.state = 0;
+          AudioEngine.pop();
+        } else {
+          cell.state = 2;
+          AudioEngine.pop();
+        }
+      }
+
+      AppState.save();
+      renderBoard();
+      checkWin();
+    }
+
+    function handleCellAltClick(index) {
+      if (AppState.isWon) return;
+      const cell = AppState.board[index];
+      recordHistory();
+      cell.state = cell.state === 2 ? 0 : 2;
+      AudioEngine.pop();
+      AppState.save();
+      renderBoard();
+    }
+
+    function recordHistory() {
+      const snapshot = AppState.board.map(c => ({ ...c }));
+      AppState.history.push(snapshot);
+      if (AppState.history.length > 30) AppState.history.shift();
+    }
+
+    function checkWin() {
+      const cats = AppState.board.filter(c => c.state === 1);
+      if (cats.length !== AppState.N) return;
+      const conflicts = detectConflicts();
+      if (conflicts.size === 0) {
+        AppState.isWon = true;
+        clearInterval(AppState.timerInterval);
+        AudioEngine.win();
+        document.getElementById('win-desc').textContent = `Completed in ${formatTime(AppState.timerSec)}! Brilliant feline intuition!`;
+        document.getElementById('win-modal').classList.add('active');
+      }
+    }
+
+    function updateStats() {
+      const catCount = AppState.board.filter(c => c.state === 1).length;
+      document.getElementById('cats-left').textContent = `${catCount} / ${AppState.N}`;
+      document.getElementById('board-size-lbl').textContent = `${AppState.N}×${AppState.N}`;
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function startTimer() {
+      if (AppState.timerInterval) clearInterval(AppState.timerInterval);
+      AppState.timerInterval = setInterval(() => {
+        AppState.timerSec++;
+        document.getElementById('timer').textContent = formatTime(AppState.timerSec);
+        if (AppState.timerSec % 5 === 0) AppState.save();
+      }, 1000);
+    }
+
+    function newGame(size) {
+      if (size) AppState.N = parseInt(size, 10);
+      const puzzle = generatePuzzle(AppState.N);
+      AppState.board = puzzle.board;
+      AppState.solution = puzzle.solution;
+      AppState.history = [];
+      AppState.timerSec = 0;
+      AppState.isWon = false;
+      document.getElementById('timer').textContent = '00:00';
+      AppState.save();
+      renderBoard();
+      startTimer();
+    }
+
+    // Hint feature
+    function giveHint() {
+      if (AppState.isWon) return;
+      // Find an unfilled solution cat
+      const unplaced = AppState.solution.find(sol => {
+        const cell = AppState.board.find(b => b.r === sol.r && b.c === sol.c);
+        return cell.state !== 1;
+      });
+      if (unplaced) {
+        recordHistory();
+        const target = AppState.board.find(b => b.r === unplaced.r && b.c === unplaced.c);
+        target.state = 1;
+        AudioEngine.meow();
+        AppState.save();
+        renderBoard();
+        checkWin();
+      }
+    }
+
+    // App Icon PNG generator for clean exports
+    function generateIconPngBlob(size) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Dark background
+        ctx.fillStyle = '#0D1117';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, size, size, size * 0.22);
+        ctx.fill();
+
+        // Icon art
+        ctx.fillStyle = '#58A6FF';
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = `${Math.floor(size * 0.45)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🐱', size / 2, size / 2);
+
+        canvas.toBlob(blob => resolve(blob), 'image/png');
+      });
+    }
+
+    // ZIP export helper
+    async function exportPwaZip() {
+      const btn = document.getElementById('btn-export-pwa');
+      const originalText = btn.textContent;
+      btn.textContent = 'Generating ZIP...';
+      btn.disabled = true;
+
+      try {
+        const zip = new JSZip();
+
+        // 1. Current HTML
+        const htmlContent = document.documentElement.outerHTML;
+        zip.file("index.html", "<!DOCTYPE html>\n" + htmlContent);
+
+        // 2. manifest.json
+        const manifestRes = await fetch('./manifest.json').catch(() => null);
+        let manifestText = manifestRes ? await manifestRes.text() : null;
+        if (!manifestText) {
+          manifestText = JSON.stringify({
+            "name": "Catdoku Logic Puzzle",
+            "short_name": "Catdoku",
+            "start_url": "./index.html",
+            "scope": "./",
+            "display": "standalone",
+            "background_color": "#0D1117",
+            "theme_color": "#0D1117",
+            "icons": [
+              { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+              { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+              { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }
+            ]
+          }, null, 2);
+        }
+        zip.file("manifest.json", manifestText);
+
+        // 3. sw.js
+        const swContent = `const CACHE_NAME = 'catdoku-cache-v1';
+const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
+
+self.addEventListener('install', (e) => {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).catch(() => {}));
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  const isHtmlOrCore = event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+  if (isHtmlOrCore) {
+    event.respondWith(
+      fetch(event.request).then((res) => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
+});
+`;
+        zip.file("sw.js", swContent);
+
+        // 4. icon.svg
+        const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="128" fill="#0D1117"/>
+  <circle cx="256" cy="256" r="190" fill="#58A6FF"/>
+  <text x="50%" y="54%" font-size="220" text-anchor="middle" dominant-baseline="middle">🐱</text>
+</svg>`;
+        zip.file("icon.svg", svgIcon);
+
+        // 5. Generated PNG Icons
+        const icon192Blob = await generateIconPngBlob(192);
+        const icon512Blob = await generateIconPngBlob(512);
+        zip.file("icon-192.png", icon192Blob);
+        zip.file("icon-512.png", icon512Blob);
+
+        // 6. GitHub Pages .nojekyll
+        zip.file(".nojekyll", "");
+
+        // Generate clean ZIP
+        const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = "catdoku-pwa.zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+      } catch (err) {
+        alert("Failed to create ZIP: " + err.message);
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    // Attach Event Listeners
+    window.addEventListener('DOMContentLoaded', () => {
+      const modeCat = document.getElementById('mode-cat');
+      const modeX = document.getElementById('mode-x');
+
+      modeCat.addEventListener('click', () => {
+        AppState.mode = 'cat';
+        modeCat.classList.add('active');
+        modeX.classList.remove('active');
+      });
+
+      modeX.addEventListener('click', () => {
+        AppState.mode = 'x';
+        modeX.classList.add('active');
+        modeCat.classList.remove('active');
+      });
+
+      document.getElementById('btn-undo').addEventListener('click', () => {
+        if (AppState.history.length > 0) {
+          AppState.board = AppState.history.pop();
+          AppState.save();
+          renderBoard();
+        }
+      });
+
+      document.getElementById('btn-clear').addEventListener('click', () => {
+        recordHistory();
+        AppState.board.forEach(c => c.state = 0);
+        AppState.save();
+        renderBoard();
+      });
+
+      document.getElementById('btn-hint').addEventListener('click', giveHint);
+      document.getElementById('btn-new').addEventListener('click', () => newGame());
+
+      // Settings Modal
+      const settingsModal = document.getElementById('settings-modal');
+      document.getElementById('btn-settings').addEventListener('click', () => {
+        document.getElementById('size-select').value = AppState.N;
+        document.getElementById('sound-toggle').checked = AudioEngine.enabled;
+        settingsModal.classList.add('active');
+      });
+      document.getElementById('btn-close-settings').addEventListener('click', () => {
+        settingsModal.classList.remove('active');
+      });
+      document.getElementById('size-select').addEventListener('change', (e) => {
+        newGame(e.target.value);
+        settingsModal.classList.remove('active');
+      });
+      document.getElementById('sound-toggle').addEventListener('change', (e) => {
+        AudioEngine.enabled = e.target.checked;
+        AppState.save();
+      });
+
+      // Win Modal
+      document.getElementById('btn-win-next').addEventListener('click', () => {
+        document.getElementById('win-modal').classList.remove('active');
+        newGame();
+      });
+
+      document.getElementById('btn-export-pwa').addEventListener('click', exportPwaZip);
+
+      // Initialize Game
+      if (!AppState.load()) {
+        newGame(5);
+      } else {
+        renderBoard();
+        startTimer();
+      }
+
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then((registration) => {
+          registration.update();
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') registration.update();
+          });
+        }).catch(() => {});
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      }
+    });
+  </script>
+</body>
+</html>
